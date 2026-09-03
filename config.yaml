@@ -1,0 +1,46 @@
+# ---- Cau hinh chung cua pipeline ----
+project:
+  name: it-jobs-pipeline
+  timezone: Asia/Ho_Chi_Minh
+
+paths:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  db_path: data/db/jobs.db
+  log_dir: logs
+
+crawl:
+  # Lich su: dung 1 nguon truoc, them nguon sau bang cach khai bao o day
+  sources:
+    - name: itviec
+      enabled: true
+      base_url: https://itviec.com
+      list_path: /it-jobs
+      max_pages: 5           # so trang danh sach can duyet
+      fetch_detail: true     # co vao trang chi tiet lay JD + skill day du khong
+      max_details: 200       # gioi han so tin lay chi tiet moi lan chay
+
+    - name: topcv
+      enabled: false         # BAT khi da kiem chung parser tren HTML that
+      base_url: https://www.topcv.vn
+      list_path: /tim-viec-lam-it-phan-mem-c10026
+      max_pages: 3
+      fetch_detail: false
+      max_details: 100
+
+  http:
+    timeout: 20
+    max_retries: 4
+    backoff_factor: 1.5
+    delay_seconds: 1.5       # nghi giua 2 request (lich su voi server)
+    jitter: 0.7              # ngau nhien hoa do tre de tranh pattern deu
+    user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"
+
+clean:
+  usd_to_vnd: 25400          # ty gia quy doi luong USD -> VND (cap nhat khi can)
+  drop_if_no_title: true
+  dedupe_keys: [source, source_job_id]
+
+dashboard:
+  page_title: "Thi truong viec lam IT Viet Nam"
+  top_n_skills: 20
