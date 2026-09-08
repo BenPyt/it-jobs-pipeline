@@ -4,6 +4,7 @@ Chay:  streamlit run dashboard/app.py
 """
 from __future__ import annotations
 
+import json
 import sys
 from collections import Counter
 from pathlib import Path
@@ -29,13 +30,47 @@ st.set_page_config(page_title=cfg.dashboard["page_title"], page_icon="📊", lay
 
 
 # ---------------------------------------------------------------- du lieu
+SNAPSHOT_CSV = ROOT / "data" / "snapshot" / "jobs_snapshot.csv"
+SNAPSHOT_META = ROOT / "data" / "snapshot" / "meta.json"
+
+
 @st.cache_data(ttl=300)
-def load_data() -> pd.DataFrame:
-    store = JobStore(resolve(cfg.paths.db_path))
-    try:
-        return store.load_jobs()
-    finally:
-        store.close()
+def load_data() -> tuple[pd.DataFrame, dict]:
+    """Doc du lieu theo thu tu uu tien: CSDL cuc bo -> ban chup trong repo.
+
+    Khi chay tren may ban, CSDL SQLite la nguon day du va moi nhat.
+    Khi deploy len Streamlit Cloud thi khong co CSDL (thu muc data/ khong len
+    Git), nen doc ban chup CSV da commit kem repo. `info` cho biet dang xem
+    nguon nao de hien thi dung ghi chu cho nguoi doc.
+    """
+    db_path = resolve(cfg.paths.db_path)
+    if db_path.exists():
+        store = JobStore(db_path)
+        try:
+            df = store.load_jobs()
+        finally:
+            store.close()
+        if not df.empty:
+            return df, {"origin": "db"}
+
+    if SNAPSHOT_CSV.exists():
+        df = pd.read_csv(SNAPSHOT_CSV)
+        for col in ("skills", "locations"):
+            if col in df.columns:
+                df[col] = df[col].fillna("").apply(
+                    lambda v: [x.strip() for x in str(v).split(",") if x.strip()]
+                )
+        if "salary_disclosed" in df.columns:
+            df["salary_disclosed"] = df["salary_disclosed"].astype(bool)
+        meta = {}
+        if SNAPSHOT_META.exists():
+            try:
+                meta = json.loads(SNAPSHOT_META.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                meta = {}
+        return df, {"origin": "snapshot", **meta}
+
+    return pd.DataFrame(), {"origin": "empty"}
 
 
 def base_layout(fig: go.Figure, height: int = 340) -> go.Figure:
@@ -53,7 +88,7 @@ def base_layout(fig: go.Figure, height: int = 340) -> go.Figure:
     return fig
 
 
-df = load_data()
+df, data_info = load_data()
 
 st.title("📊 Thị trường việc làm IT Việt Nam")
 
@@ -65,6 +100,15 @@ if df.empty:
         "python run_pipeline.py --from-raw data/raw/SAMPLE_jobs_demo.json` để xem thử với dữ liệu mô phỏng."
     )
     st.stop()
+
+if data_info.get("origin") == "snapshot":
+    exported = str(data_info.get("exported_at", ""))[:10]
+    st.info(
+        f"Đang xem **bản chụp dữ liệu ngày {exported}** kèm theo mã nguồn "
+        f"({data_info.get('n_jobs', len(df))} tin từ ITviec và CareerLink). "
+        "Đây không phải dữ liệu thời gian thực — chạy `python run_pipeline.py` "
+        "trên máy để crawl bản mới nhất."
+    )
 
 if df["url"].astype(str).str.contains("example.invalid").any():
     st.error(

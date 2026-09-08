@@ -4,6 +4,8 @@ Pipeline dữ liệu end-to-end: **crawl → làm sạch → SQLite → dashboar
 Thu thập tin tuyển dụng IT từ ITviec và CareerLink để trả lời: kỹ năng nào đang được tuyển nhiều nhất,
 mức lương theo cấp bậc ra sao, thị trường tập trung ở đâu.
 
+**Dashboard trực tuyến:** _(dán link Streamlit sau khi deploy)_
+
 ![Dashboard tổng quan](docs/dashboard-tong-quan.png)
 
 ## Kết quả (dữ liệu ngày 08/09/2026)
@@ -95,6 +97,29 @@ python run_pipeline.py --from-html data/raw/html_20260908_133752         # bóc 
 streamlit run dashboard/app.py
 pytest -q
 ```
+
+## Chạy tự động hằng ngày
+
+`scripts/run_daily.bat` crawl cả hai nguồn rồi xuất lại bản chụp dữ liệu. Đăng ký với Windows
+Task Scheduler để dữ liệu tự tích luỹ:
+
+1. Mở **Task Scheduler** → *Create Basic Task*
+2. Trigger: **Daily**, chọn giờ thấp điểm (ví dụ 07:00)
+3. Action: *Start a program* → trỏ tới `scripts\run_daily.bat`
+4. Trong tab *General*, tick **Run whether user is logged on or not**
+
+Mỗi lần chạy chỉ cập nhật `last_seen_at` của tin đã có và thêm tin mới (ghi idempotent), nên chạy
+lại bao nhiêu lần cũng an toàn. Sau vài tuần, cặp `first_seen_at`/`last_seen_at` đủ để phân tích
+vòng đời tin tuyển dụng — thứ không trang nào công bố sẵn.
+
+## Dashboard công khai
+
+Dashboard deploy trên Streamlit Community Cloud đọc **bản chụp dữ liệu** trong
+`data/snapshot/jobs_snapshot.csv` (157 KB) thay vì CSDL SQLite, vì thư mục `data/` không được đưa
+lên Git. Ứng dụng tự chọn nguồn: có CSDL cục bộ thì dùng CSDL, không thì quay về bản chụp và hiển
+thị rõ ngày chụp để người xem không nhầm là dữ liệu thời gian thực.
+
+Cập nhật bản chụp: `python scripts/export_snapshot.py` rồi commit.
 
 ## Những quyết định kỹ thuật đáng chú ý
 

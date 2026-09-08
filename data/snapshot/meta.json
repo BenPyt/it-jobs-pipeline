@@ -1,0 +1,10 @@
+{
+  "exported_at": "2026-09-08T09:50:40+00:00",
+  "n_jobs": 409,
+  "n_companies": 231,
+  "sources": {
+    "itviec": 287,
+    "careerlink": 122
+  },
+  "n_salary_disclosed": 57
+}

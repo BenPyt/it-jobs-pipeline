@@ -7,7 +7,13 @@ data/raw/*
 data/processed/*
 data/db/*
 !data/**/.gitkeep
+# Ban chup nhe de dashboard cong khai co du lieu hien thi - CO dua len Git
+!data/snapshot/
+!data/snapshot/*
 logs/
 .pytest_cache/
 .streamlit/secrets.toml
+
+# Ghi chu ca nhan va file nen tam - khong dua len repo
 *.docx
+*.tar.gz
