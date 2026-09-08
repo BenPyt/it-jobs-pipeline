@@ -4,7 +4,7 @@ Pipeline dữ liệu end-to-end: **crawl → làm sạch → SQLite → dashboar
 Thu thập tin tuyển dụng IT từ ITviec và CareerLink để trả lời: kỹ năng nào đang được tuyển nhiều nhất,
 mức lương theo cấp bậc ra sao, thị trường tập trung ở đâu.
 
-**Dashboard trực tuyến:** _(dán link Streamlit sau khi deploy)_
+**Dashboard trực tuyến:** (http://it-jobs-pipeline-vn.streamlit.app/)
 
 ![Dashboard tổng quan](docs/dashboard-tong-quan.png)
 
