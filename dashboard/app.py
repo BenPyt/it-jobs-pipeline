@@ -82,7 +82,7 @@ with st.sidebar:
     pick_cities = st.multiselect("Thành phố", cities, default=cities)
 
     levels = [lv for lv in
-              ["Intern", "Fresher", "Junior", "Middle", "Senior", "Lead",
+              ["Intern", "Fresher", "Junior", "Nhân viên", "Middle", "Senior", "Lead",
                "Principal/Architect", "Manager", "Head/Director", "Không rõ"]
               if lv in set(df["seniority"])]
     pick_levels = st.multiselect("Cấp bậc", levels, default=levels)
@@ -141,7 +141,7 @@ with tab_overview:
 
     with right:
         st.subheader("Số tin theo cấp bậc")
-        order = ["Intern", "Fresher", "Junior", "Middle", "Senior", "Lead",
+        order = ["Intern", "Fresher", "Junior", "Nhân viên", "Middle", "Senior", "Lead",
                  "Principal/Architect", "Manager", "Head/Director", "Không rõ"]
         by_lv = view["seniority"].value_counts()
         by_lv = by_lv.reindex([o for o in order if o in by_lv.index])
@@ -215,7 +215,7 @@ with tab_salary:
         st.plotly_chart(base_layout(fig), use_container_width=True)
 
         st.subheader("Lương theo cấp bậc")
-        order = ["Intern", "Fresher", "Junior", "Middle", "Senior", "Lead",
+        order = ["Intern", "Fresher", "Junior", "Nhân viên", "Middle", "Senior", "Lead",
                  "Principal/Architect", "Manager", "Head/Director", "Không rõ"]
         present = [o for o in order if o in set(paid["seniority"])]
         stat = (

@@ -52,3 +52,21 @@ def test_ghi_csdl_idempotent(tmp_path):
         assert "Đà Nẵng" in back[back["source_job_id"] == "2275972"].iloc[0]["locations"]
     finally:
         store.close()
+
+
+def test_clean_jobs_rong_van_du_cot():
+    """Chay pipeline khi crawl duoc 0 tin khong duoc lam sap chuong trinh."""
+    df = clean_jobs([])
+    assert df.empty
+    for col in ("job_key", "title", "salary_min_vnd", "skills", "sources", "n_sources"):
+        assert col in df.columns
+
+
+def test_cap_bac_lay_tu_nhan_cua_trang():
+    df = clean_jobs([dict(
+        source="careerlink", source_job_id="1", url="u", title="Nhân viên IT phần cứng",
+        company="ABC", location_raw="Bắc Ninh", salary_raw="7 triệu - 9 triệu",
+        extra={"career_level": "Quản lý / Trưởng phòng"},
+        crawled_at="2026-09-08T07:00:00+00:00")])
+    assert df.iloc[0]["seniority"] == "Manager"
+    assert df.iloc[0]["salary_min_vnd"] == 7_000_000

@@ -17,7 +17,7 @@ import pandas as pd
 
 from .location import parse_arrangement, parse_locations, primary_location
 from .salary import parse_salary
-from .seniority import parse_seniority
+from .seniority import parse_career_level, parse_seniority
 from .skills import normalize_skills
 
 log = logging.getLogger(__name__)
@@ -66,6 +66,12 @@ def clean_jobs(raw_jobs: Iterable[dict[str, Any]], usd_to_vnd: float = 25_400) -
             continue
 
         salary = parse_salary(raw.get("salary_raw"), usd_to_vnd=usd_to_vnd)
+
+        # Cap bac: uu tien nhan do chinh trang tuyen dung gan (CareerLink co
+        # truong "career_level"); chi doan tu tieu de khi khong co nhan nao.
+        seniority = parse_seniority(title)
+        if seniority == "Không rõ":
+            seniority = parse_career_level((raw.get("extra") or {}).get("career_level"))
         locations = parse_locations(raw.get("location_raw"))
         skills = normalize_skills(raw.get("skills_raw"))
 
@@ -79,7 +85,7 @@ def clean_jobs(raw_jobs: Iterable[dict[str, Any]], usd_to_vnd: float = 25_400) -
                 "title_clean": _clean_title(title),
                 "company": (raw.get("company") or "").strip() or None,
                 "company_key": _fold(raw.get("company") or ""),
-                "seniority": parse_seniority(title),
+                "seniority": seniority,
                 "location_primary": primary_location(raw.get("location_raw")),
                 "locations": locations,
                 "work_arrangement": parse_arrangement(
@@ -102,7 +108,12 @@ def clean_jobs(raw_jobs: Iterable[dict[str, Any]], usd_to_vnd: float = 25_400) -
 
     df = pd.DataFrame(rows, columns=COLUMNS + ["_content_key"])
     if df.empty:
-        return df.drop(columns=["_content_key"])
+        # Ham nay cam ket tra ve DataFrame co day du cot - phai giu loi ca khi
+        # khong co dong nao, neu khong moi noi goi deu phai tu kiem tra df.empty.
+        empty = df.drop(columns=["_content_key"])
+        empty["sources"] = pd.Series(dtype="object")
+        empty["n_sources"] = pd.Series(dtype="int64")
+        return empty
 
     before = len(df)
     # 1) trung lap trong cung nguon: giu ban crawl moi nhat

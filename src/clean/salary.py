@@ -26,6 +26,7 @@ def _strip_accents(text: str) -> str:
 NEGOTIABLE_TOKENS = (
     "sign in to view salary",
     "thoa thuan",
+    "thuong luong",
     "negotiable",
     "canh tranh",
     "competitive",

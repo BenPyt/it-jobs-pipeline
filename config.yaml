@@ -20,8 +20,17 @@ crawl:
       fetch_detail: true     # co vao trang chi tiet lay JD + skill day du khong
       max_details: 200       # gioi han so tin lay chi tiet moi lan chay
 
+    - name: careerlink
+      enabled: true          # nguon co LUONG CONG KHAI (ITviec an luong)
+      base_url: https://www.careerlink.vn
+      list_path: /viec-lam/k/C%C3%B4ng-Ngh%E1%BB%87-Th%C3%B4ng-Tin
+      max_pages: 13          # ~50 tin/trang, tong ~644 tin
+      fetch_detail: false    # trang danh sach da du: luong, dia diem, cap bac
+      max_details: 0
+      it_only: true          # loc bo tin ngoai nganh IT (trang loc theo tu khoa)
+
     - name: topcv
-      enabled: false         # BAT khi da kiem chung parser tren HTML that
+      enabled: false         # 403 Forbidden - trang chan truy cap tu dong
       base_url: https://www.topcv.vn
       list_path: /tim-viec-lam-it-phan-mem-c10026
       max_pages: 3

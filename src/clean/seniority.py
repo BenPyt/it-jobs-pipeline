@@ -27,9 +27,35 @@ LEVEL_PATTERNS: list[tuple[str, str]] = [
 ]
 
 ORDER = [
-    "Intern", "Fresher", "Junior", "Middle", "Senior",
+    "Intern", "Fresher", "Junior", "Nhân viên", "Middle", "Senior",
     "Lead", "Principal/Architect", "Manager", "Head/Director", "Không rõ",
 ]
+
+
+# CareerLink cung cap san cap bac o the <a class="job-position"> - dang tin cay
+# hon la doan tu tieu de, nen dung lam nguon uu tien khi co.
+CAREER_LEVEL_MAP: list[tuple[str, str]] = [
+    (r"thuc tap", "Intern"),
+    (r"moi tot nghiep|sinh vien", "Fresher"),
+    (r"giam doc|tong giam doc|c-?level", "Head/Director"),
+    (r"quan ly|truong phong", "Manager"),
+    (r"truong nhom|giam sat|team lead", "Lead"),
+    (r"chuyen vien cao cap|chuyen gia", "Senior"),
+    # "Nhan vien" cua trang tuyen dung Viet Nam la mot thang KHAC voi
+    # "Middle Developer" cua ITviec - giu rieng de khong tron hai he quy chieu.
+    (r"nhan vien|chuyen vien", "Nhân viên"),
+]
+
+
+def parse_career_level(level: str | None) -> str:
+    """Doi nhan cap bac cua trang tuyen dung (tieng Viet) ve thang chuan."""
+    if not level:
+        return "Không rõ"
+    text = _norm(level)
+    for pattern, canonical in CAREER_LEVEL_MAP:
+        if re.search(pattern, text):
+            return canonical
+    return "Không rõ"
 
 
 def parse_seniority(title: str | None) -> str:
