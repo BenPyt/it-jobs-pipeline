@@ -17,16 +17,32 @@ if exist ".venv\Scripts\activate.bat" (
     echo [canh bao] Khong tim thay .venv - dung Python he thong.
 )
 
+REM Ma tra ve: 0 = binh thuong | 1 = pipeline loi | 2 = vi pham nguong chat luong
+set FAILED=0
+
 echo [%date% %time%] Bat dau crawl CareerLink
 python run_pipeline.py --sources careerlink
-if errorlevel 1 echo [loi] CareerLink that bai
+if errorlevel 2 (
+    echo [CANH BAO] CareerLink vi pham nguong chat luong - kiem tra tab "Suc khoe pipeline"
+    set FAILED=1
+) else if errorlevel 1 (
+    echo [LOI] CareerLink that bai
+    set FAILED=1
+)
 
 echo [%date% %time%] Bat dau crawl ITviec
 python run_pipeline.py --sources itviec --max-pages 15 --no-detail
-if errorlevel 1 echo [loi] ITviec that bai
+if errorlevel 2 (
+    echo [CANH BAO] ITviec vi pham nguong chat luong - kiem tra tab "Suc khoe pipeline"
+    set FAILED=1
+) else if errorlevel 1 (
+    echo [LOI] ITviec that bai
+    set FAILED=1
+)
 
 echo [%date% %time%] Xuat ban chup du lieu
 python scripts\export_snapshot.py
 
 echo [%date% %time%] Xong.
-endlocal
+REM Tra ma loi ra ngoai de Task Scheduler ghi nhan dung trang thai lan chay
+endlocal & exit /b %FAILED%

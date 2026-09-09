@@ -33,7 +33,21 @@ class JobStore:
 
     def _init_schema(self) -> None:
         self.conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        self._migrate()
         self.conn.commit()
+
+    def _migrate(self) -> None:
+        """Them cot moi vao CSDL da ton tai.
+
+        CREATE TABLE IF NOT EXISTS khong dung cho bang da co san - no bo qua
+        luon, nen cot moi se khong bao gio duoc them. Day la buoc chuyen doi
+        toi thieu de CSDL cu van dung duoc voi phien ban code moi.
+        """
+        existing = {r["name"] for r in self.conn.execute("PRAGMA table_info(crawl_runs)")}
+        for col, ddl in (("quality", "TEXT"), ("n_issues", "INTEGER DEFAULT 0")):
+            if col not in existing:
+                self.conn.execute(f"ALTER TABLE crawl_runs ADD COLUMN {col} {ddl}")
+                log.info("Da them cot crawl_runs.%s", col)
 
     # ---- theo doi cac lan chay ----
     def start_run(self, sources: list[str]) -> int:
@@ -44,12 +58,43 @@ class JobStore:
         self.conn.commit()
         return int(cur.lastrowid)
 
-    def finish_run(self, run_id: int, n_raw: int, n_clean: int, status: str = "success", note: str = "") -> None:
+    def finish_run(self, run_id: int, n_raw: int, n_clean: int, status: str = "success",
+                   note: str = "", quality: dict | None = None) -> None:
         self.conn.execute(
-            "UPDATE crawl_runs SET finished_at=?, n_raw=?, n_clean=?, status=?, note=? WHERE run_id=?",
-            (_now(), n_raw, n_clean, status, note, run_id),
+            "UPDATE crawl_runs SET finished_at=?, n_raw=?, n_clean=?, status=?, note=?, "
+            "quality=?, n_issues=? WHERE run_id=?",
+            (_now(), n_raw, n_clean, status, note,
+             json.dumps(quality, ensure_ascii=False) if quality else None,
+             len((quality or {}).get("issues", [])), run_id),
         )
         self.conn.commit()
+
+    def previous_source_counts(self, before_run_id: int) -> dict[str, int]:
+        """So tin theo nguon cua lan chay THANH CONG gan nhat truoc do.
+
+        Dung lam moc so sanh: hom nay thu duoc it hon han hom qua la dau hieu
+        parser bi gay chu khong phai thi truong bong dung it viec.
+        """
+        row = self.conn.execute(
+            "SELECT quality FROM crawl_runs WHERE run_id < ? AND quality IS NOT NULL "
+            "AND status != 'failed' ORDER BY run_id DESC LIMIT 1",
+            (before_run_id,),
+        ).fetchone()
+        if not row or not row["quality"]:
+            return {}
+        try:
+            return json.loads(row["quality"]).get("per_source", {})
+        except json.JSONDecodeError:
+            return {}
+
+    def load_runs(self, limit: int = 60) -> pd.DataFrame:
+        """Lich su cac lan chay - nguon du lieu cho tab suc khoe cua dashboard."""
+        df = pd.read_sql_query(
+            "SELECT run_id, started_at, finished_at, sources, n_raw, n_clean, status, "
+            "note, n_issues, quality FROM crawl_runs ORDER BY run_id DESC LIMIT ?",
+            self.conn, params=(limit,),
+        )
+        return df
 
     # ---- ghi du lieu ----
     def _skill_id(self, name: str) -> int:

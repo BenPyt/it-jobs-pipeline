@@ -50,6 +50,19 @@ clean:
   drop_if_no_title: true
   dedupe_keys: [source, source_job_id]
 
+# ---- Nguong kiem tra chat luong sau moi lan chay ----
+# Vi pham nguong "failed" se lam pipeline tra ma loi khac 0, de Task Scheduler
+# ghi nhan la that bai thay vi bao thanh cong nham.
+quality:
+  min_jobs_per_source: 20       # moi nguon phai thu duoc it nhat bao nhieu tin
+  max_drop_vs_previous_pct: 50  # tut qua % nay so voi lan truoc -> nghi parser gay
+  min_salary_disclosed_pct: 0   # 0 = khong kiem tra
+  max_missing_pct:              # ty le thieu toi da cho tung cot
+    title: 0
+    url: 0
+    company: 15
+    location_primary: 25
+
 dashboard:
   page_title: "Thi truong viec lam IT Viet Nam"
   top_n_skills: 20

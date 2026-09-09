@@ -37,6 +37,7 @@ def main() -> int:
     store = JobStore(resolve(cfg.paths.db_path))
     try:
         df = store.load_jobs()
+        runs = store.load_runs(limit=90)
     finally:
         store.close()
 
@@ -51,6 +52,10 @@ def main() -> int:
 
     csv_path = SNAPSHOT_DIR / "jobs_snapshot.csv"
     out.to_csv(csv_path, index=False, encoding="utf-8-sig")
+
+    # Lich su cac lan chay: nguon du lieu cho tab "Suc khoe" khi dashboard
+    # chay tren Streamlit Cloud (o do khong co CSDL SQLite).
+    runs.to_csv(SNAPSHOT_DIR / "runs_snapshot.csv", index=False, encoding="utf-8-sig")
 
     meta = {
         "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

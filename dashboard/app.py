@@ -31,6 +31,7 @@ st.set_page_config(page_title=cfg.dashboard["page_title"], page_icon="📊", lay
 
 # ---------------------------------------------------------------- du lieu
 SNAPSHOT_CSV = ROOT / "data" / "snapshot" / "jobs_snapshot.csv"
+RUNS_CSV = ROOT / "data" / "snapshot" / "runs_snapshot.csv"
 SNAPSHOT_META = ROOT / "data" / "snapshot" / "meta.json"
 
 
@@ -71,6 +72,23 @@ def load_data() -> tuple[pd.DataFrame, dict]:
         return df, {"origin": "snapshot", **meta}
 
     return pd.DataFrame(), {"origin": "empty"}
+
+
+@st.cache_data(ttl=300)
+def load_runs() -> pd.DataFrame:
+    """Lich su cac lan chay pipeline - uu tien CSDL, khong co thi doc ban chup."""
+    db_path = resolve(cfg.paths.db_path)
+    if db_path.exists():
+        store = JobStore(db_path)
+        try:
+            runs = store.load_runs(limit=90)
+        finally:
+            store.close()
+        if not runs.empty:
+            return runs
+    if RUNS_CSV.exists():
+        return pd.read_csv(RUNS_CSV)
+    return pd.DataFrame()
 
 
 def base_layout(fig: go.Figure, height: int = 340) -> go.Figure:
@@ -166,8 +184,8 @@ st.caption(
     "(thường ghi “Thoả thuận” hoặc yêu cầu đăng nhập) — mọi số liệu lương bên dưới chỉ tính trên phần có công bố."
 )
 
-tab_overview, tab_skills, tab_salary, tab_data = st.tabs(
-    ["Tổng quan", "Kỹ năng", "Lương", "Dữ liệu"]
+tab_overview, tab_skills, tab_salary, tab_data, tab_health = st.tabs(
+    ["Tổng quan", "Kỹ năng", "Lương", "Dữ liệu", "Sức khoẻ pipeline"]
 )
 
 # ---------------------------------------------------------------- tong quan
@@ -297,3 +315,67 @@ with tab_data:
         file_name="it_jobs_filtered.csv",
         mime="text/csv",
     )
+
+
+# ---------------------------------------------------------------- suc khoe
+with tab_health:
+    st.subheader("Lịch sử các lần chạy pipeline")
+    st.caption(
+        "Pipeline chạy tự động mỗi ngày. Sau mỗi lần chạy, dữ liệu được đối chiếu với "
+        "một bộ quy tắc (số tin tối thiểu mỗi nguồn, tỷ lệ thiếu từng cột, mức sụt giảm "
+        "so với lần trước). Mục đích: phát hiện ngay khi trang nguồn đổi giao diện làm "
+        "parser gãy, thay vì vài tuần sau mới nhận ra số liệu đứng yên."
+    )
+
+    runs = load_runs()
+    if runs.empty:
+        st.info("Chưa có lịch sử lần chạy nào.")
+    else:
+        latest = runs.iloc[0]
+        status = str(latest.get("status", ""))
+        h1, h2, h3 = st.columns(3)
+        h1.metric("Lần chạy gần nhất", str(latest.get("started_at", ""))[:16].replace("T", " "))
+        h2.metric("Số tin thu được", int(latest.get("n_clean") or 0))
+        h3.metric("Số vấn đề phát hiện", int(latest.get("n_issues") or 0))
+
+        if status == "success":
+            st.success("Lần chạy gần nhất: bình thường, không có cảnh báo.")
+        elif status == "failed_quality":
+            st.error("Lần chạy gần nhất **vi phạm ngưỡng chất lượng** — nhiều khả năng parser đã gãy.")
+        elif status == "failed":
+            st.error("Lần chạy gần nhất **thất bại** trước khi hoàn tất.")
+
+        # Chi tiết vấn đề của lần chạy gần nhất
+        raw_quality = latest.get("quality")
+        if isinstance(raw_quality, str) and raw_quality.strip():
+            try:
+                q = json.loads(raw_quality)
+            except json.JSONDecodeError:
+                q = {}
+            for issue in q.get("issues", []):
+                line = f"**{issue.get('check')}** — {issue.get('message')}"
+                (st.error if issue.get("level") == "failed" else st.warning)(line)
+
+        # Diễn biến số tin qua các lần chạy
+        hist = runs.sort_values("run_id").copy()
+        hist["Thời điểm"] = pd.to_datetime(hist["started_at"], errors="coerce", utc=True)
+        hist = hist.dropna(subset=["Thời điểm"])
+        if len(hist) >= 2:
+            st.subheader("Số tin thu được qua các lần chạy")
+            fig = go.Figure(go.Scatter(
+                x=hist["Thời điểm"], y=hist["n_clean"], mode="lines+markers",
+                line=dict(color=PRIMARY, width=2), marker=dict(size=8, color=PRIMARY),
+                hovertemplate="%{x|%d/%m %H:%M}<br>%{y} tin<extra></extra>",
+            ))
+            fig.update_layout(xaxis_title=None, yaxis_title="Số tin sau làm sạch")
+            st.plotly_chart(base_layout(fig), use_container_width=True)
+            st.caption(
+                "Đường này tụt đột ngột là dấu hiệu sớm nhất của việc trang nguồn đổi giao diện."
+            )
+
+        st.subheader("Bảng lịch sử")
+        show_runs = runs[["run_id", "started_at", "sources", "n_raw", "n_clean",
+                          "status", "n_issues", "note"]].copy()
+        show_runs.columns = ["Lần", "Bắt đầu", "Nguồn", "Tin thô", "Sau làm sạch",
+                             "Trạng thái", "Vấn đề", "Ghi chú"]
+        st.dataframe(show_runs, use_container_width=True, hide_index=True)

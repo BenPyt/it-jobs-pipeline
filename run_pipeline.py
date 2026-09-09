@@ -23,6 +23,7 @@ from src.crawl import SCRAPERS, RawJob
 from src.crawl.http import HttpClient
 from src.crawl.rawstore import RawWriter, read_raw
 from src.logging_setup import setup_logging
+from src.quality import FAILED, check_quality
 from src.store import JobStore
 
 log = logging.getLogger("pipeline")
@@ -196,13 +197,34 @@ def main() -> int:
                      quality_report(df).head(8).to_string(index=False))
 
         inserted, updated = store.upsert_jobs(df, run_id=run_id)
-        store.finish_run(run_id, n_raw=len(raw_jobs), n_clean=len(df),
-                         note=f"moi={inserted}, cap_nhat={updated}")
+
+        # --- Kiem tra chat luong: bat loi ngay trong lan chay, khong doi den
+        # luc mo dashboard vai tuan sau moi thay so lieu dung yen ---
+        report = check_quality(
+            df,
+            rules=dict(cfg.get("quality", {})),
+            previous=store.previous_source_counts(run_id),
+            expected_sources=sources,
+        )
+        log.info("%s", report.summary())
+
+        status = "failed_quality" if report.status == FAILED else "success"
+        store.finish_run(run_id, n_raw=len(raw_jobs), n_clean=len(df), status=status,
+                         note=f"moi={inserted}, cap_nhat={updated}",
+                         quality=report.to_dict())
+
         print(f"\nXong. Tin tho: {len(raw_jobs)} | Sau lam sach: {len(df)} | "
               f"Moi: {inserted} | Cap nhat: {updated}")
+        print(f"Chat luong: {report.status.upper()}"
+              + (f" ({len(report.issues)} van de)" if report.issues else ""))
+        for issue in report.issues:
+            print(f"  [{issue.level}] {issue.message}")
         print(f"CSDL: {resolve(cfg.paths.db_path)}")
         print("Chay dashboard: streamlit run dashboard/app.py")
-        return 0
+
+        # Ma tra ve khac 0 de Task Scheduler ghi nhan la that bai - neu luon
+        # tra ve 0 thi lich chay tu dong se bao "thanh cong" ke ca khi hong.
+        return 2 if report.status == FAILED else 0
     except Exception as exc:  # noqa: BLE001
         log.exception("Pipeline that bai")
         store.finish_run(run_id, 0, 0, status="failed", note=str(exc)[:500])

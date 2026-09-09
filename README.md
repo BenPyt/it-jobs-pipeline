@@ -112,6 +112,33 @@ Mỗi lần chạy chỉ cập nhật `last_seen_at` của tin đã có và thê
 lại bao nhiêu lần cũng an toàn. Sau vài tuần, cặp `first_seen_at`/`last_seen_at` đủ để phân tích
 vòng đời tin tuyển dụng — thứ không trang nào công bố sẵn.
 
+## Giám sát chất lượng dữ liệu
+
+Pipeline chạy tự động mỗi ngày, nghĩa là không ai ngồi đọc log. Nếu trang nguồn đổi giao diện làm
+parser gãy, pipeline vẫn báo "thành công" và ghi dữ liệu rỗng vào CSDL — vài tuần sau mở dashboard
+mới phát hiện số liệu đứng yên. Đó là dạng hỏng nguy hiểm nhất của một hệ thống tự động.
+
+`src/quality.py` biến các giả định ngầm thành quy tắc tường minh, đối chiếu sau **mỗi** lần chạy:
+
+| Nhóm quy tắc | Kiểm tra gì | Mức |
+|---|---|---|
+| Ngưỡng tuyệt đối | Mỗi nguồn khai báo trong config phải thu được ≥ 20 tin | failed nếu 0 tin |
+| Tỷ lệ thiếu | `title`/`url` không được thiếu; `company` ≤ 15%, `location_primary` ≤ 25% | failed / warning |
+| So với lần trước | Số tin tụt quá 50% so với lần chạy thành công gần nhất | failed |
+
+Quy tắc thứ ba là quan trọng nhất: thị trường ít việc hơn một chút là bình thường, nhưng tụt từ
+122 xuống 5 tin sau một đêm thì gần như chắc chắn là parser gãy chứ không phải thị trường thay đổi.
+
+Kết quả ghi vào bảng `crawl_runs` dạng JSON, và **pipeline trả mã lỗi 2** khi vi phạm ngưỡng
+nghiêm trọng — nhờ vậy Windows Task Scheduler ghi nhận đúng là thất bại thay vì báo thành công nhầm.
+Ngưỡng cấu hình trong `config.yaml`, mục `quality`.
+
+Tab **Sức khoẻ pipeline** trên dashboard hiển thị lịch sử các lần chạy, cảnh báo của lần gần nhất,
+và biểu đồ số tin theo thời gian — đường này tụt đột ngột là dấu hiệu sớm nhất của việc trang nguồn
+đổi giao diện.
+
+![Sức khoẻ pipeline](docs/dashboard-suc-khoe.png)
+
 ## Dashboard công khai
 
 Dashboard deploy trên Streamlit Community Cloud đọc **bản chụp dữ liệu** trong

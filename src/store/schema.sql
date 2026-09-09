@@ -9,7 +9,9 @@ CREATE TABLE IF NOT EXISTS crawl_runs (
     n_raw        INTEGER DEFAULT 0,
     n_clean      INTEGER DEFAULT 0,
     status       TEXT DEFAULT 'running',
-    note         TEXT
+    note         TEXT,
+    quality      TEXT,                  -- bao cao chat luong dang JSON
+    n_issues     INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS jobs (
